@@ -5,8 +5,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Con
 
 logging.basicConfig(level=logging.INFO)
 
-BOT_TOKEN = 
-def parse_signal(text):
+BOT_TOKEN = "7813887099:AAESXWLS8ieQsy4Ty0g4i4oWRA99ckZxs_Udef parse_signal(text):"
     text = text.lower()
 
     direction = None
