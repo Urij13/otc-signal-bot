@@ -1,63 +1,40 @@
-
-import os
+import re
+import logging
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
-from datetime import datetime
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-USER_ID_WHITELIST = os.getenv("USER_ID_WHITELIST", "")
-LANGUAGE = os.getenv("LANGUAGE", "uk")
-TIME_START = os.getenv("TIME_START", "18:00")
-TIME_END = os.getenv("TIME_END", "00:00")
+logging.basicConfig(level=logging.INFO)
 
-WHITELIST_IDS = [int(x) for x in USER_ID_WHITELIST.split(",") if x.strip().isdigit()]
+BOT_TOKEN = 7813887099:AAESXWLS8ieQsy4Ty0g4i4oWRA99ckZxs_U
+def parse_signal(text):
+    text = text.lower()
 
-texts = {
-    "uk": {
-        "start": "👋 Привіт! Надішли сигнал (⬆️ або ⬇️) + пара.",
-        "not_allowed": "❌ У тебе немає доступу.",
-        "invalid": "⚠️ Надішли сигнал ⬆️ або ⬇️ разом з назвою пари.",
-        "out_of_time": "⏰ Зараз бот не приймає сигнали (лише з 18:00 до 00:00)."
-    },
-    "en": {
-        "start": "👋 Hi! Send a signal (⬆️ or ⬇️) with the pair.",
-        "not_allowed": "❌ You are not allowed to use this bot.",
-        "invalid": "⚠️ Send signal ⬆️ or ⬇️ with pair name.",
-        "out_of_time": "⏰ Bot only accepts signals from 18:00 to 00:00."
-    }
-}
+    direction = None
+    if "⬆" in text or "вгору" in text or "вверх" in text or "up" in text or re.search(r'\^+', text):
+        direction = "⬆️"
+    elif "⬇" in text or "вниз" in text or "down" in text or re.search(r'v+', text):
+        direction = "⬇️"
 
-def is_in_time():
-    now = datetime.now().time()
-    start = datetime.strptime(TIME_START, "%H:%M").time()
-    end = datetime.strptime(TIME_END, "%H:%M").time()
-    return start <= now <= end if start < end else now >= start or now <= end
+    match = re.search(r"([A-Z]{3}/[A-Z]{3})", text.upper())
+    pair = match.group(1) if match else None
+
+    return pair, direction
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in WHITELIST_IDS:
-        await update.message.reply_text(texts[LANGUAGE]["not_allowed"])
-        return
-    await update.message.reply_text(texts[LANGUAGE]["start"])
+    await update.message.reply_text("👋 Привіт! Надішли сигнал (⬆️ або ⬇️) + назву пари.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in WHITELIST_IDS:
-        return
+    user_input = update.message.text
+    pair, direction = parse_signal(user_input)
 
-    if not is_in_time():
-        await update.message.reply_text(texts[LANGUAGE]["out_of_time"])
-        return
+    if pair and direction:
+        await update.message.reply_text(f"✅ Сигнал прийнято:\nПара: {pair}\nНапрямок: {direction}")
+    else:
+        await update.message.reply_text("⚠️ Надішли сигнал ⬆️ або ⬇️ разом з назвою пари (наприклад: EUR/USD OTC ⬆️)")
 
-    text = update.message.text.strip()
-    if not (("⬆️" in text or "⬇️" in text) and len(text.split()) >= 1):
-        await update.message.reply_text(texts[LANGUAGE]["invalid"])
-        return
+app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    for uid in WHITELIST_IDS:
-        if uid != update.effective_user.id:
-            await context.bot.send_message(chat_id=uid, text=text)
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.run_polling()
+app.run_polling()
